@@ -73,7 +73,7 @@ def make_parse():
     arg = parser.add_argument
     arg("--tile-num", type=int, default=64)
     arg("--tile-size", type=int, default=192)
-    arg("--res-level", type=int, default=1, help="0:High, 1:Middle, 2:Low")
+    arg("--res-level", type=int, default=0, help="0:High, 1:Middle, 2:Low")
     arg("--resize", type=int, default=None)
     arg("--mode", type=int, default=0)
     return parser.parse_args()
