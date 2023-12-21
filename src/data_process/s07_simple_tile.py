@@ -79,6 +79,15 @@ def make_parse():
     return parser.parse_args()
 
 
+def read_tiff(img_path, log_file_path="error_file.txt"):
+    try:
+        return skimage.io.MultiImage(img_path)[0]
+    except Exception as e:
+        with open(log_file_path, 'a') as log_file:
+            log_file.write(f"TIFF file: '{img_path}', error: {e}" + '\n')
+        return None
+
+
 def main():
 
     args = make_parse()
@@ -109,33 +118,36 @@ def main():
             mask_path = mask_dir / (img_id + "_mask.tiff")
 
             # RGB
-            image = skimage.io.MultiImage(img_path)[res_level]
+            image = read_tiff(img_path)
+            
             mask = None
             if mask_path.exists():
-                mask = skimage.io.MultiImage(str(mask_path))[res_level]
-            tiles, masks, _ = get_tiles(
-                img=image, tile_size=tile_size, n_tiles=n_tiles, mask=mask, mode=mode
-            )
+                mask = read_tiff(str(mask_path))
+            
+            if isinstance(image, np.ndarray):
+                tiles, masks, _ = get_tiles(
+                    img=image, tile_size=tile_size, n_tiles=n_tiles, mask=mask, mode=mode
+                )
 
-            if resize_size is not None:
-                tiles = [cv2.resize(t, (resize_size, resize_size)) for t in tiles]
-                masks = [cv2.resize(m, (resize_size, resize_size)) for m in masks]
+                if resize_size is not None:
+                    tiles = [cv2.resize(t, (resize_size, resize_size)) for t in tiles]
+                    masks = [cv2.resize(m, (resize_size, resize_size)) for m in masks]
 
-            for idx, img in enumerate(tiles):
-                # RGB
-                x_tot.append((img / 255.0).reshape(-1, 3).mean(0))
-                x2_tot.append(((img / 255.0) ** 2).reshape(-1, 3).mean(0))
+                for idx, img in enumerate(tiles):
+                    # RGB
+                    x_tot.append((img / 255.0).reshape(-1, 3).mean(0))
+                    x2_tot.append(((img / 255.0) ** 2).reshape(-1, 3).mean(0))
 
-                # if read with PIL RGB turns into BGR
-                # We get CRC error when unzip if not cv2.imencode
-                img = cv2.imencode(".png", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))[1]
-                img_out.writestr(f"{img_id}_{idx}.png", img)
+                    # if read with PIL RGB turns into BGR
+                    # We get CRC error when unzip if not cv2.imencode
+                    img = cv2.imencode(".png", cv2.cvtColor(img, cv2.COLOR_RGB2BGR))[1]
+                    img_out.writestr(f"{img_id}_{idx}.png", img)
 
-                # mask[:, :, 0] has value in {0, 1, 2, 3, 4, 5}, other mask is 0 only
-                if mask is not None:
-                    mask = masks[idx]
-                    mask = cv2.imencode(".png", mask[:, :, 0])[1]
-                    mask_out.writestr(f"{img_id}_{idx}.png", mask)
+                    # mask[:, :, 0] has value in {0, 1, 2, 3, 4, 5}, other mask is 0 only
+                    if mask is not None:
+                        mask = masks[idx]
+                        mask = cv2.imencode(".png", mask[:, :, 0])[1]
+                        mask_out.writestr(f"{img_id}_{idx}.png", mask)
 
     # image stats
     img_avr = np.array(x_tot).mean(0)
